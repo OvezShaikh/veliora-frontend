@@ -148,3 +148,5 @@ input[type=file]{padding:.5rem}
  .modal{grid-template-columns:1fr}.modal .m-media .media{min-height:0;aspect-ratio:4/3}
  .tiles{grid-template-columns:1fr 1fr}.form .row3{grid-template-columns:1fr}
 }
+
+.demobar{background:#c9a24a22;border-bottom:1px solid var(--gold);color:var(--pale);text-align:center;font-size:.85rem;padding:.45rem 1rem}

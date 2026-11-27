@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
-import Hero3D from '../components/Hero3D.jsx'
+import { lazy, Suspense } from 'react'
+import ErrorBoundary from '../components/ErrorBoundary.jsx'
 import { useApp } from '../store.jsx'
 import { Media } from '../components/ProductArt.jsx'
+
+const Hero3D = lazy(() => import('../components/Hero3D.jsx'))
 
 const loop = [
   ['Reduce', 'We buy factory waste PP bags, jumbo bags and raffia bags, so they go back into use instead of landfill.'],
@@ -14,7 +17,7 @@ export default function Home() {
   return (
     <>
       <section className="hero">
-        <div className="hero-3d"><Hero3D /></div>
+        <div className="hero-3d"><ErrorBoundary><Suspense fallback={null}><Hero3D /></Suspense></ErrorBoundary></div>
         <div className="wrap hero-copy">
           <img src="/logo-mark.png" alt="Veliora mark" className="mark" width="132" height="96" />
           <h1>Veliora Polymars</h1>

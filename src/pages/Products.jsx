@@ -71,7 +71,7 @@ function Modal({ p, onClose }) {
 }
 
 export default function Products() {
-  const { db } = useApp()
+  const { db, loaded } = useApp()
   const [cat, setCat] = useState('all')
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(null)
@@ -92,7 +92,7 @@ export default function Products() {
           </div>
           <input className="search" type="search" placeholder="Search materials" aria-label="Search materials" value={q} onChange={e => setQ(e.target.value)} />
         </div>
-        {list.length === 0
+        {!loaded ? <p className="muted">Loading…</p> : list.length === 0
           ? <p className="muted">Nothing matches. Clear the search or call <a href="tel:+919226045847">9226045847</a>.</p>
           : <div className="pcards">{list.map(p => <Card key={p.id} p={p} onOpen={setOpen} />)}</div>}
         <div className="callout">

@@ -13,7 +13,8 @@ const ROLE = { user: 'Customer', admin: 'Admin', superadmin: 'Super admin' }
 const fmt = d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function Dashboard() {
-  const { user } = useApp()
+  const { user, ready } = useApp()
+  if (!ready) return <section className="wrap page"><p className="muted">Loading…</p></section>
   if (!user) return <Navigate to="/login" replace />
   return <Panel key={user.id} user={user} />
 }
@@ -86,57 +87,69 @@ function Inquiries() {
 
 const ARTS = [['pp-white', 'White bale'], ['pp-yellow', 'Yellow bale'], ['bopp-colour', 'Colour film bale'], ['bopp-mix', 'Mixed film bale'], ['bag-white', 'White bags'], ['bag-mixed', 'Mixed bags'], ['jumbo', 'Jumbo bag'], ['raffia', 'Raffia bag']]
 
-// Shrinks an uploaded photo so it fits in browser storage.
-const toDataUrl = file => new Promise((res, rej) => {
-  const r = new FileReader()
-  r.onload = () => {
-    const img = new Image()
-    img.onload = () => {
-      const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas')
-      c.width = img.width * k; c.height = img.height * k
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
-      res(c.toDataURL('image/jpeg', 0.78))
-    }
-    img.onerror = rej; img.src = r.result
+// Shrinks a chosen photo to a JPEG blob (max 1000px) before it is uploaded.
+const resize = file => new Promise((res, rej) => {
+  const url = URL.createObjectURL(file), img = new Image()
+  img.onload = () => {
+    const k = Math.min(1, 1000 / Math.max(img.width, img.height)), c = document.createElement('canvas')
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+    URL.revokeObjectURL(url)
+    c.toBlob(b => (b ? res(b) : rej()), 'image/jpeg', 0.82)
   }
-  r.onerror = rej; r.readAsDataURL(file)
+  img.onerror = () => { URL.revokeObjectURL(url); rej() }
+  img.src = url
 })
 
 function Products() {
-  const { db, addProduct, deleteProduct, updateProduct } = useApp()
-  const empty = { name: '', category: 'We deal in', desc: '', material: '', colour: '', qty: 'Bulk', price: '', unit: 'kg', art: 'pp-white', image: '' }
+  const { db, addProduct, deleteProduct, updateProduct, setProductPhoto } = useApp()
+  const empty = { name: '', category: 'We deal in', desc: '', material: '', colour: '', qty: 'Bulk', price: '', unit: 'kg', art: 'pp-white', image: '', file: null }
   const [f, setF] = useState(empty)
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const set = k => e => setF({ ...f, [k]: e.target.value })
   const pick = async e => {
     const file = e.target.files[0]; if (!file) return
-    try { const image = await toDataUrl(file); setF(x => ({ ...x, image })); setErr('') } catch { setErr('That file could not be read as an image.') }
+    try { const blob = await resize(file); setF(x => ({ ...x, file: blob, image: URL.createObjectURL(blob) })); setErr('') } catch { setErr('That file could not be read as an image.') }
+  }
+  const submit = async e => {
+    e.preventDefault(); const form = e.currentTarget; setBusy(true)
+    const m = await addProduct(f); setBusy(false)
+    if (m) setErr(m); else { setF(empty); setErr(''); form.reset() }
+  }
+  const changePhoto = async (id, e) => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return
+    try { const m = await setProductPhoto(id, await resize(file)); if (m) setErr(m) } catch { setErr('That file could not be read as an image.') }
   }
   return (
     <>
-      <form className="form inline" onSubmit={e => { e.preventDefault(); addProduct(f); setF(empty) }}>
+      <form className="form inline" onSubmit={submit}>
         <div className="row"><label>Name<input required value={f.name} onChange={set('name')} /></label>
           <label>Category<select value={f.category} onChange={set('category')}><option>We deal in</option><option>We buy</option></select></label></div>
         <label>Description<input required value={f.desc} onChange={set('desc')} /></label>
         <div className="row"><label>Material<input value={f.material} onChange={set('material')} placeholder="e.g. Polypropylene (PP)" /></label>
           <label>Colour<input value={f.colour} onChange={set('colour')} /></label></div>
-        <div className="row3"><label>Rate in ₹<input type="number" min="0" step="0.01" value={f.price} onChange={set('price')} placeholder="Leave empty for “On request”" /></label>
+        <div className="row3"><label>Rate in ₹<input type="number" min="0" step="0.01" value={f.price} onChange={set('price')} placeholder="Empty = On request" /></label>
           <label>Per<select value={f.unit} onChange={set('unit')}><option>kg</option><option>tonne</option></select></label>
           <label>Quantity<input value={f.qty} onChange={set('qty')} /></label></div>
         <div className="row"><label>Photo (JPG or PNG)<input type="file" accept="image/*" onChange={pick} /></label>
           <label>No photo? Use illustration<select value={f.art} onChange={set('art')}>{ARTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label></div>
         {err && <div className="note err" role="alert">{err}</div>}
-        <div className="addrow"><div className="thumb"><Media p={{ ...f, name: f.name || 'Preview' }} /></div><button className="btn sm" type="submit">Add product</button></div>
+        <div className="addrow"><div className="thumb"><Media p={{ ...f, name: f.name || 'Preview' }} /></div><button className="btn sm" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add product'}</button></div>
       </form>
       <div className="tablewrap"><table>
-        <thead><tr><th>Product</th><th>Type</th><th>Rate in ₹ per {' '}kg/tonne</th><th /></tr></thead>
+        <thead><tr><th>Product</th><th>Type</th><th>Rate in ₹</th><th /></tr></thead>
         <tbody>{db.products.map(p => (
           <tr key={p.id}>
             <td><div className="prow"><div className="thumb sm"><Media p={p} /></div>{p.name}</div></td>
             <td>{p.category}</td>
-            <td><div className="rate"><input type="number" min="0" step="0.01" aria-label={`Rate for ${p.name}`} value={p.price} placeholder="On request" onChange={e => updateProduct(p.id, { price: e.target.value })} />
+            <td><div className="rate">
+              <input type="number" min="0" step="0.01" aria-label={`Rate for ${p.name}`} placeholder="On request" key={p.id + '-' + p.price} defaultValue={p.price}
+                onBlur={e => String(e.target.value) !== String(p.price) && updateProduct(p.id, { price: e.target.value })} />
               <select aria-label="Unit" value={p.unit || 'kg'} onChange={e => updateProduct(p.id, { unit: e.target.value })}><option>kg</option><option>tonne</option></select></div></td>
-            <td><button className="btn ghost sm" onClick={() => window.confirm(`Delete “${p.name}”?`) && deleteProduct(p.id)}>Delete</button></td>
+            <td><div className="rate">
+              <label className="btn ghost sm">Photo<input type="file" accept="image/*" hidden onChange={e => changePhoto(p.id, e)} /></label>
+              <button className="btn ghost sm" onClick={() => window.confirm(`Delete “${p.name}”?`) && deleteProduct(p.id)}>Delete</button></div></td>
           </tr>))}</tbody>
       </table></div>
     </>

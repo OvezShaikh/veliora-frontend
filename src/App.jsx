@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, useLocation, Link } from 'react-router-dom'
-import { Provider } from './store.jsx'
+import { Provider, isDemo } from './store.jsx'
 import { Nav, Footer } from './components/Layout.jsx'
 import Home from './pages/Home.jsx'
 import About from './pages/About.jsx'
@@ -14,6 +14,7 @@ function Shell() {
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
   return (
     <>
+      {isDemo && <div className="demobar">Preview version: sample data, saved only in this browser. Quote requests are not sent to anyone yet.</div>}
       <Nav />
       <main>
         <Routes>

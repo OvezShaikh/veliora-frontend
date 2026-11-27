@@ -5,8 +5,16 @@ export default function InquiryForm({ product = '', compact = false }) {
   const { db, user, addInquiry } = useApp()
   const [f, setF] = useState({ name: user?.name || '', email: user?.email || '', phone: '', product, qty: '', message: '' })
   const [sent, setSent] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   const set = k => e => setF({ ...f, [k]: e.target.value })
-  const submit = e => { e.preventDefault(); addInquiry({ ...f, userId: user?.id || null }); setSent(true); setF({ ...f, qty: '', message: '' }) }
+  const submit = async e => {
+    e.preventDefault(); setBusy(true); setErr('')
+    const m = await addInquiry(f)
+    setBusy(false)
+    if (m) return setErr(m)
+    setSent(true); setF({ ...f, qty: '', message: '' })
+  }
   if (sent) return (
     <div className="note ok" role="status">
       <strong>Quote request sent.</strong> We reply within one working day.
@@ -30,7 +38,8 @@ export default function InquiryForm({ product = '', compact = false }) {
       </div>
       <label>Quantity needed<input value={f.qty} onChange={set('qty')} placeholder="e.g. 5 tonnes per month" /></label>
       {!compact && <label>Details<textarea rows="4" value={f.message} onChange={set('message')} placeholder="Buying or selling, colour, delivery location" /></label>}
-      <button className="btn" type="submit">Send quote request</button>
+      {err && <div className="note err" role="alert">{err}</div>}
+      <button className="btn" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send quote request'}</button>
     </form>
   )
 }
